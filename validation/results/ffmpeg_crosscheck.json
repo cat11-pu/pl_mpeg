@@ -1,0 +1,908 @@
+{
+  "streams": 100,
+  "identical": 0,
+  "same_length": 82,
+  "max_abs_diff": 11,
+  "results": [
+    {
+      "file": "000_16x16_24fps_q1_g1_b0.mpg",
+      "candidate_bytes": 1536,
+      "ffmpeg_bytes": 1536,
+      "same_length": true,
+      "diff_bytes": 840,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "001_32x24_24fps_q4_g6_b0.mpg",
+      "candidate_bytes": 12672,
+      "ffmpeg_bytes": 12672,
+      "same_length": true,
+      "diff_bytes": 4648,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "002_48x32_24fps_q7_g11_b1.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 20736,
+      "same_length": false,
+      "diff_bytes": 7864,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "003_64x48_24fps_q10_g1_b0.mpg",
+      "candidate_bytes": 32256,
+      "ffmpeg_bytes": 32256,
+      "same_length": true,
+      "diff_bytes": 9591,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "004_96x64_24fps_q13_g6_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 10002,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "005_128x96_24fps_q16_g11_b0.mpg",
+      "candidate_bytes": 221184,
+      "ffmpeg_bytes": 221184,
+      "same_length": true,
+      "diff_bytes": 40224,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "006_176x144_24fps_q19_g1_b0.mpg",
+      "candidate_bytes": 380160,
+      "ffmpeg_bytes": 380160,
+      "same_length": true,
+      "diff_bytes": 50054,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "007_320x240_24fps_q2_g6_b2.mpg",
+      "candidate_bytes": 921600,
+      "ffmpeg_bytes": 921600,
+      "same_length": true,
+      "diff_bytes": 120186,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "008_352x288_24fps_q5_g11_b0.mpg",
+      "candidate_bytes": 912384,
+      "ffmpeg_bytes": 912384,
+      "same_length": true,
+      "diff_bytes": 97264,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "009_640x480_24fps_q8_g1_b0.mpg",
+      "candidate_bytes": 1843200,
+      "ffmpeg_bytes": 1843200,
+      "same_length": true,
+      "diff_bytes": 75719,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "010_720x480_24fps_q11_g6_b1.mpg",
+      "candidate_bytes": 5184000,
+      "ffmpeg_bytes": 5702400,
+      "same_length": false,
+      "diff_bytes": 747656,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "011_720x576_24fps_q14_g11_b2.mpg",
+      "candidate_bytes": 4976640,
+      "ffmpeg_bytes": 5598720,
+      "same_length": false,
+      "diff_bytes": 793511,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "012_16x16_25fps_q17_g1_b0.mpg",
+      "candidate_bytes": 2688,
+      "ffmpeg_bytes": 2688,
+      "same_length": true,
+      "diff_bytes": 1120,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "013_32x24_25fps_q20_g6_b0.mpg",
+      "candidate_bytes": 5760,
+      "ffmpeg_bytes": 5760,
+      "same_length": true,
+      "diff_bytes": 1774,
+      "max_abs_diff": 11,
+      "identical": false
+    },
+    {
+      "file": "014_48x32_25fps_q3_g11_b1.mpg",
+      "candidate_bytes": 27648,
+      "ffmpeg_bytes": 27648,
+      "same_length": true,
+      "diff_bytes": 10167,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "015_64x48_25fps_q6_g1_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 16206,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "016_96x64_25fps_q9_g6_b0.mpg",
+      "candidate_bytes": 73728,
+      "ffmpeg_bytes": 73728,
+      "same_length": true,
+      "diff_bytes": 19747,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "017_128x96_25fps_q12_g11_b0.mpg",
+      "candidate_bytes": 110592,
+      "ffmpeg_bytes": 110592,
+      "same_length": true,
+      "diff_bytes": 26332,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "018_176x144_25fps_q15_g1_b0.mpg",
+      "candidate_bytes": 152064,
+      "ffmpeg_bytes": 152064,
+      "same_length": true,
+      "diff_bytes": 22502,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "019_320x240_25fps_q18_g6_b2.mpg",
+      "candidate_bytes": 1267200,
+      "ffmpeg_bytes": 1267200,
+      "same_length": true,
+      "diff_bytes": 112802,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "020_352x288_25fps_q1_g11_b0.mpg",
+      "candidate_bytes": 1368576,
+      "ffmpeg_bytes": 1368576,
+      "same_length": true,
+      "diff_bytes": 174327,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "021_640x480_25fps_q4_g1_b0.mpg",
+      "candidate_bytes": 3225600,
+      "ffmpeg_bytes": 3225600,
+      "same_length": true,
+      "diff_bytes": 145090,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "022_720x480_25fps_q7_g6_b1.mpg",
+      "candidate_bytes": 2073600,
+      "ffmpeg_bytes": 2592000,
+      "same_length": false,
+      "diff_bytes": 624591,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "023_720x576_25fps_q10_g11_b2.mpg",
+      "candidate_bytes": 6842880,
+      "ffmpeg_bytes": 7464960,
+      "same_length": false,
+      "diff_bytes": 912657,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "024_16x16_30fps_q13_g1_b0.mpg",
+      "candidate_bytes": 3840,
+      "ffmpeg_bytes": 3840,
+      "same_length": true,
+      "diff_bytes": 1630,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "025_32x24_30fps_q16_g6_b0.mpg",
+      "candidate_bytes": 9216,
+      "ffmpeg_bytes": 9216,
+      "same_length": true,
+      "diff_bytes": 2266,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "026_48x32_30fps_q19_g11_b1.mpg",
+      "candidate_bytes": 13824,
+      "ffmpeg_bytes": 13824,
+      "same_length": true,
+      "diff_bytes": 3885,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "027_64x48_30fps_q2_g1_b0.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 18432,
+      "same_length": true,
+      "diff_bytes": 6923,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "028_96x64_30fps_q5_g6_b0.mpg",
+      "candidate_bytes": 101376,
+      "ffmpeg_bytes": 101376,
+      "same_length": true,
+      "diff_bytes": 29076,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "029_128x96_30fps_q8_g11_b0.mpg",
+      "candidate_bytes": 165888,
+      "ffmpeg_bytes": 165888,
+      "same_length": true,
+      "diff_bytes": 34846,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "030_176x144_30fps_q11_g1_b0.mpg",
+      "candidate_bytes": 266112,
+      "ffmpeg_bytes": 266112,
+      "same_length": true,
+      "diff_bytes": 50300,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "031_320x240_30fps_q14_g6_b2.mpg",
+      "candidate_bytes": 576000,
+      "ffmpeg_bytes": 576000,
+      "same_length": true,
+      "diff_bytes": 52679,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "032_352x288_30fps_q17_g11_b0.mpg",
+      "candidate_bytes": 1824768,
+      "ffmpeg_bytes": 1824768,
+      "same_length": true,
+      "diff_bytes": 145973,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "033_640x480_30fps_q20_g1_b0.mpg",
+      "candidate_bytes": 4608000,
+      "ffmpeg_bytes": 4608000,
+      "same_length": true,
+      "diff_bytes": 146600,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "034_720x480_30fps_q3_g6_b1.mpg",
+      "candidate_bytes": 4147200,
+      "ffmpeg_bytes": 4147200,
+      "same_length": true,
+      "diff_bytes": 277326,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "035_720x576_30fps_q6_g11_b2.mpg",
+      "candidate_bytes": 3110400,
+      "ffmpeg_bytes": 3732480,
+      "same_length": false,
+      "diff_bytes": 781747,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "036_16x16_50fps_q9_g1_b0.mpg",
+      "candidate_bytes": 1536,
+      "ffmpeg_bytes": 1536,
+      "same_length": true,
+      "diff_bytes": 800,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "037_32x24_50fps_q12_g6_b0.mpg",
+      "candidate_bytes": 12672,
+      "ffmpeg_bytes": 12672,
+      "same_length": true,
+      "diff_bytes": 4579,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "038_48x32_50fps_q15_g11_b1.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 20736,
+      "same_length": false,
+      "diff_bytes": 7929,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "039_64x48_50fps_q18_g1_b0.mpg",
+      "candidate_bytes": 32256,
+      "ffmpeg_bytes": 32256,
+      "same_length": true,
+      "diff_bytes": 8057,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "040_96x64_50fps_q1_g6_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 14859,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "041_128x96_50fps_q4_g11_b0.mpg",
+      "candidate_bytes": 221184,
+      "ffmpeg_bytes": 221184,
+      "same_length": true,
+      "diff_bytes": 48872,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "042_176x144_50fps_q7_g1_b0.mpg",
+      "candidate_bytes": 380160,
+      "ffmpeg_bytes": 380160,
+      "same_length": true,
+      "diff_bytes": 68169,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "043_320x240_50fps_q10_g6_b2.mpg",
+      "candidate_bytes": 921600,
+      "ffmpeg_bytes": 921600,
+      "same_length": true,
+      "diff_bytes": 84878,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "044_352x288_50fps_q13_g11_b0.mpg",
+      "candidate_bytes": 912384,
+      "ffmpeg_bytes": 912384,
+      "same_length": true,
+      "diff_bytes": 71618,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "045_640x480_50fps_q16_g1_b0.mpg",
+      "candidate_bytes": 1843200,
+      "ffmpeg_bytes": 1843200,
+      "same_length": true,
+      "diff_bytes": 58323,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "046_720x480_50fps_q19_g6_b1.mpg",
+      "candidate_bytes": 5184000,
+      "ffmpeg_bytes": 5702400,
+      "same_length": false,
+      "diff_bytes": 700594,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "047_720x576_50fps_q2_g11_b2.mpg",
+      "candidate_bytes": 4976640,
+      "ffmpeg_bytes": 5598720,
+      "same_length": false,
+      "diff_bytes": 935990,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "048_16x16_24fps_q5_g1_b0.mpg",
+      "candidate_bytes": 2688,
+      "ffmpeg_bytes": 2688,
+      "same_length": true,
+      "diff_bytes": 1484,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "049_32x24_24fps_q8_g6_b0.mpg",
+      "candidate_bytes": 5760,
+      "ffmpeg_bytes": 5760,
+      "same_length": true,
+      "diff_bytes": 1898,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "050_48x32_24fps_q11_g11_b1.mpg",
+      "candidate_bytes": 27648,
+      "ffmpeg_bytes": 27648,
+      "same_length": true,
+      "diff_bytes": 8275,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "051_64x48_24fps_q14_g1_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 14051,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "052_96x64_24fps_q17_g6_b0.mpg",
+      "candidate_bytes": 73728,
+      "ffmpeg_bytes": 73728,
+      "same_length": true,
+      "diff_bytes": 15144,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "053_128x96_24fps_q20_g11_b0.mpg",
+      "candidate_bytes": 110592,
+      "ffmpeg_bytes": 110592,
+      "same_length": true,
+      "diff_bytes": 18047,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "054_176x144_24fps_q3_g1_b0.mpg",
+      "candidate_bytes": 152064,
+      "ffmpeg_bytes": 152064,
+      "same_length": true,
+      "diff_bytes": 35059,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "055_320x240_24fps_q6_g6_b2.mpg",
+      "candidate_bytes": 1267200,
+      "ffmpeg_bytes": 1267200,
+      "same_length": true,
+      "diff_bytes": 162432,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "056_352x288_24fps_q9_g11_b0.mpg",
+      "candidate_bytes": 1368576,
+      "ffmpeg_bytes": 1368576,
+      "same_length": true,
+      "diff_bytes": 135870,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "057_640x480_24fps_q12_g1_b0.mpg",
+      "candidate_bytes": 3225600,
+      "ffmpeg_bytes": 3225600,
+      "same_length": true,
+      "diff_bytes": 161369,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "058_720x480_24fps_q15_g6_b1.mpg",
+      "candidate_bytes": 2073600,
+      "ffmpeg_bytes": 2592000,
+      "same_length": false,
+      "diff_bytes": 595083,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "059_720x576_24fps_q18_g11_b2.mpg",
+      "candidate_bytes": 6842880,
+      "ffmpeg_bytes": 7464960,
+      "same_length": false,
+      "diff_bytes": 872013,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "060_16x16_25fps_q1_g1_b0.mpg",
+      "candidate_bytes": 3840,
+      "ffmpeg_bytes": 4224,
+      "same_length": false,
+      "diff_bytes": 2484,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "061_32x24_25fps_q4_g6_b0.mpg",
+      "candidate_bytes": 9216,
+      "ffmpeg_bytes": 9216,
+      "same_length": true,
+      "diff_bytes": 3401,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "062_48x32_25fps_q7_g11_b1.mpg",
+      "candidate_bytes": 13824,
+      "ffmpeg_bytes": 13824,
+      "same_length": true,
+      "diff_bytes": 4165,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "063_64x48_25fps_q10_g1_b0.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 18432,
+      "same_length": true,
+      "diff_bytes": 5500,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "064_96x64_25fps_q13_g6_b0.mpg",
+      "candidate_bytes": 101376,
+      "ffmpeg_bytes": 101376,
+      "same_length": true,
+      "diff_bytes": 22635,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "065_128x96_25fps_q16_g11_b0.mpg",
+      "candidate_bytes": 165888,
+      "ffmpeg_bytes": 165888,
+      "same_length": true,
+      "diff_bytes": 29623,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "066_176x144_25fps_q19_g1_b0.mpg",
+      "candidate_bytes": 266112,
+      "ffmpeg_bytes": 266112,
+      "same_length": true,
+      "diff_bytes": 33512,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "067_320x240_25fps_q2_g6_b2.mpg",
+      "candidate_bytes": 576000,
+      "ffmpeg_bytes": 576000,
+      "same_length": true,
+      "diff_bytes": 74152,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "068_352x288_25fps_q5_g11_b0.mpg",
+      "candidate_bytes": 1824768,
+      "ffmpeg_bytes": 1824768,
+      "same_length": true,
+      "diff_bytes": 206349,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "069_640x480_25fps_q8_g1_b0.mpg",
+      "candidate_bytes": 4608000,
+      "ffmpeg_bytes": 4608000,
+      "same_length": true,
+      "diff_bytes": 190656,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "070_720x480_25fps_q11_g6_b1.mpg",
+      "candidate_bytes": 4147200,
+      "ffmpeg_bytes": 4147200,
+      "same_length": true,
+      "diff_bytes": 183219,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "071_720x576_25fps_q14_g11_b2.mpg",
+      "candidate_bytes": 3110400,
+      "ffmpeg_bytes": 3732480,
+      "same_length": false,
+      "diff_bytes": 724460,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "072_16x16_30fps_q17_g1_b0.mpg",
+      "candidate_bytes": 1536,
+      "ffmpeg_bytes": 1536,
+      "same_length": true,
+      "diff_bytes": 640,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "073_32x24_30fps_q20_g6_b0.mpg",
+      "candidate_bytes": 12672,
+      "ffmpeg_bytes": 12672,
+      "same_length": true,
+      "diff_bytes": 3945,
+      "max_abs_diff": 11,
+      "identical": false
+    },
+    {
+      "file": "074_48x32_30fps_q3_g11_b1.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 20736,
+      "same_length": false,
+      "diff_bytes": 9104,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "075_64x48_30fps_q6_g1_b0.mpg",
+      "candidate_bytes": 32256,
+      "ffmpeg_bytes": 32256,
+      "same_length": true,
+      "diff_bytes": 11321,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "076_96x64_30fps_q9_g6_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 11904,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "077_128x96_30fps_q12_g11_b0.mpg",
+      "candidate_bytes": 221184,
+      "ffmpeg_bytes": 221184,
+      "same_length": true,
+      "diff_bytes": 54250,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "078_176x144_30fps_q15_g1_b0.mpg",
+      "candidate_bytes": 380160,
+      "ffmpeg_bytes": 380160,
+      "same_length": true,
+      "diff_bytes": 56757,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "079_320x240_30fps_q18_g6_b2.mpg",
+      "candidate_bytes": 921600,
+      "ffmpeg_bytes": 921600,
+      "same_length": true,
+      "diff_bytes": 80012,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "080_352x288_30fps_q1_g11_b0.mpg",
+      "candidate_bytes": 912384,
+      "ffmpeg_bytes": 912384,
+      "same_length": true,
+      "diff_bytes": 112696,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "081_640x480_30fps_q4_g1_b0.mpg",
+      "candidate_bytes": 1843200,
+      "ffmpeg_bytes": 1843200,
+      "same_length": true,
+      "diff_bytes": 81424,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "082_720x480_30fps_q7_g6_b1.mpg",
+      "candidate_bytes": 5184000,
+      "ffmpeg_bytes": 5702400,
+      "same_length": false,
+      "diff_bytes": 786339,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "083_720x576_30fps_q10_g11_b2.mpg",
+      "candidate_bytes": 4976640,
+      "ffmpeg_bytes": 5598720,
+      "same_length": false,
+      "diff_bytes": 829143,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "084_16x16_50fps_q13_g1_b0.mpg",
+      "candidate_bytes": 2688,
+      "ffmpeg_bytes": 2688,
+      "same_length": true,
+      "diff_bytes": 1141,
+      "max_abs_diff": 2,
+      "identical": false
+    },
+    {
+      "file": "085_32x24_50fps_q16_g6_b0.mpg",
+      "candidate_bytes": 5760,
+      "ffmpeg_bytes": 5760,
+      "same_length": true,
+      "diff_bytes": 1480,
+      "max_abs_diff": 9,
+      "identical": false
+    },
+    {
+      "file": "086_48x32_50fps_q19_g11_b1.mpg",
+      "candidate_bytes": 27648,
+      "ffmpeg_bytes": 27648,
+      "same_length": true,
+      "diff_bytes": 7835,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "087_64x48_50fps_q2_g1_b0.mpg",
+      "candidate_bytes": 46080,
+      "ffmpeg_bytes": 46080,
+      "same_length": true,
+      "diff_bytes": 17363,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "088_96x64_50fps_q5_g6_b0.mpg",
+      "candidate_bytes": 73728,
+      "ffmpeg_bytes": 73728,
+      "same_length": true,
+      "diff_bytes": 19464,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "089_128x96_50fps_q8_g11_b0.mpg",
+      "candidate_bytes": 110592,
+      "ffmpeg_bytes": 110592,
+      "same_length": true,
+      "diff_bytes": 21512,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "090_176x144_50fps_q11_g1_b0.mpg",
+      "candidate_bytes": 152064,
+      "ffmpeg_bytes": 152064,
+      "same_length": true,
+      "diff_bytes": 28388,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "091_320x240_50fps_q14_g6_b2.mpg",
+      "candidate_bytes": 1267200,
+      "ffmpeg_bytes": 1267200,
+      "same_length": true,
+      "diff_bytes": 116243,
+      "max_abs_diff": 4,
+      "identical": false
+    },
+    {
+      "file": "092_352x288_50fps_q17_g11_b0.mpg",
+      "candidate_bytes": 1368576,
+      "ffmpeg_bytes": 1368576,
+      "same_length": true,
+      "diff_bytes": 105166,
+      "max_abs_diff": 5,
+      "identical": false
+    },
+    {
+      "file": "093_640x480_50fps_q20_g1_b0.mpg",
+      "candidate_bytes": 3225600,
+      "ffmpeg_bytes": 3225600,
+      "same_length": true,
+      "diff_bytes": 101298,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "094_720x480_50fps_q3_g6_b1.mpg",
+      "candidate_bytes": 2073600,
+      "ffmpeg_bytes": 2592000,
+      "same_length": false,
+      "diff_bytes": 655688,
+      "max_abs_diff": 6,
+      "identical": false
+    },
+    {
+      "file": "095_720x576_50fps_q6_g11_b2.mpg",
+      "candidate_bytes": 6842880,
+      "ffmpeg_bytes": 7464960,
+      "same_length": false,
+      "diff_bytes": 998889,
+      "max_abs_diff": 7,
+      "identical": false
+    },
+    {
+      "file": "096_16x16_24fps_q9_g1_b0.mpg",
+      "candidate_bytes": 3840,
+      "ffmpeg_bytes": 3840,
+      "same_length": true,
+      "diff_bytes": 2000,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "097_32x24_24fps_q12_g6_b0.mpg",
+      "candidate_bytes": 9216,
+      "ffmpeg_bytes": 9216,
+      "same_length": true,
+      "diff_bytes": 3261,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "098_48x32_24fps_q15_g11_b1.mpg",
+      "candidate_bytes": 13824,
+      "ffmpeg_bytes": 13824,
+      "same_length": true,
+      "diff_bytes": 4204,
+      "max_abs_diff": 3,
+      "identical": false
+    },
+    {
+      "file": "099_64x48_24fps_q18_g1_b0.mpg",
+      "candidate_bytes": 18432,
+      "ffmpeg_bytes": 18432,
+      "same_length": true,
+      "diff_bytes": 4600,
+      "max_abs_diff": 3,
+      "identical": false
+    }
+  ]
+}
