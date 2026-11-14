@@ -65,5 +65,15 @@ https://phoboslab.org/files/bjork-all-is-full-of-love.mpg
 
 - no error reporting. PL_MPEG will silently ignore any invalid data.
 - the pts (presentation time stamp) for packets in the MPEG-PS container is
-ignored. This may cause sync issues with some files.
+  ignored. This may cause sync issues with some files.
 - bugs, probably.
+
+
+## Streaming resynchronization
+
+`plm_resync()` and `plm_video_resync()` recover from a network break in the
+middle of a frame. They scan forward to the next complete I-picture, drop the
+partial frame and undecodable P/B pictures, reset the reference chain, and let
+normal decoding continue. See
+[`test/resync/README.md`](test/resync/README.md) for the API, boundary
+handling, and byte-exact consistency test data.

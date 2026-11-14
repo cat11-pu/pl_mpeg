@@ -44,6 +44,8 @@ all: $(TARGET_EXTRACT) $(TARGET_SDL) $(TARGET_GL)
 extract: $(TARGET_EXTRACT)
 player_sdl: $(TARGET_SDL)
 player_gl: $(TARGET_GL)
+test-resync:
+	./test/resync/run.sh
 
 $(TARGET_EXTRACT):pl_mpeg_extract_frames.c pl_mpeg.h
 	$(CC) $(CFLAGS) pl_mpeg_extract_frames.c -o $(TARGET_EXTRACT) $(LFLAGS)
@@ -54,6 +56,6 @@ $(TARGET_SDL):pl_mpeg_player_sdl.c pl_mpeg.h
 $(TARGET_GL):pl_mpeg_player_gl.c pl_mpeg.h
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) pl_mpeg_player_gl.c -o $(TARGET_GL) $(LFLAGS) $(GL_LFLAGS) $(SDL_LFLAGS)
 
-.PHONY: clean
+.PHONY: clean test-resync
 clean:
 	$(RM) $(TARGET_EXTRACT) $(TARGET_SDL) $(TARGET_GL)

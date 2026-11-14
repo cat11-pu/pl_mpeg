@@ -143,6 +143,7 @@ See below for detailed the API documentation.
 #ifndef PL_MPEG_H
 #define PL_MPEG_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 
@@ -169,6 +170,32 @@ typedef struct plm_audio_t plm_audio_t;
 // have a PTS value, indicated by PLM_PACKET_INVALID_TS.
 
 #define PLM_PACKET_INVALID_TS -1
+
+// Resynchronization status codes returned by plm_video_resync() and
+// plm_resync(). A successful scan leaves the decoder positioned at the start
+// code of a complete I-picture. The caller then continues with the normal
+// plm_video_decode() / plm_decode_video() API.
+
+#define PLM_RESYNC_OK 0
+#define PLM_RESYNC_NEED_MORE_DATA 1
+#define PLM_RESYNC_END_OF_STREAM 2
+#define PLM_RESYNC_BAD_OFFSET 3
+
+// Pass this as the offset to continue a scan that returned
+// PLM_RESYNC_NEED_MORE_DATA. The scan position and counters are preserved.
+
+#define PLM_RESYNC_CONTINUE ((size_t)-1)
+
+typedef struct {
+	int status;
+	size_t source_offset;   // byte offset where the resync scan started
+	size_t frame_offset;    // byte offset of the recovered picture
+	double time;            // decoder time after recovery
+	int picture_type;       // 1=I, 2=P, 3=B; 0 when no picture was found
+	int pictures_discarded; // complete picture start codes skipped
+	int frames_lost;        // discarded pictures plus a partial leading frame
+	size_t bytes_discarded; // bytes consumed by the resync scan
+} plm_resync_info_t;
 
 typedef struct {
 	int type;
@@ -429,6 +456,22 @@ void plm_decode(plm_t *self, double seconds);
 // or until plm_destroy() is called.
 
 plm_frame_t *plm_decode_video(plm_t *self);
+
+// Discard a partial/undecodable prefix of the MPEG-PS source and resynchronize
+// the video decoder at the next complete I-picture. `offset` is a byte offset
+// into the source buffer; pass PLM_RESYNC_CONTINUE to continue a previous scan
+// that returned PLM_RESYNC_NEED_MORE_DATA. A seekable source accepts an
+// absolute offset. For a dynamic (ring) source the offset is relative to the
+// current unread data; offset 0 drops the buffered partial frame and continues
+// with the bytes that follow.
+//
+// Returns one of the PLM_RESYNC_* status codes. On success the next call to
+// plm_decode_video() / plm_decode() resumes at the recovered I-picture. The
+// audio decoder is rewound as well; audio headers re-lock on the next complete
+// MP2 frame. The optional info parameter reports where recovery happened and
+// how many pictures were skipped.
+
+int plm_resync(plm_t *self, size_t offset, plm_resync_info_t *info);
 
 
 // Decode and return one audio frame. Returns NULL if no frame could be decoded
@@ -736,6 +779,22 @@ int plm_video_has_ended(plm_video_t *self);
 
 plm_frame_t *plm_video_decode(plm_video_t *self);
 
+// Byte-level resynchronization for a raw MPEG-1 video elementary stream.
+// Scans forward from `offset` for the next complete I-picture that has at
+// least one slice. Sequence/GOP headers before that picture are parsed, but
+// partial pictures and P/B pictures are skipped. The reference chain and
+// frame-selection state are reset so the recovered picture can be decoded
+// without input from before the break. `frames_lost` is added to the decoder
+// frame counter, keeping the count-based timestamp continuous.
+//
+// `offset` is relative to the video buffer's current contents. Pass
+// PLM_RESYNC_CONTINUE to continue a scan that returned
+// PLM_RESYNC_NEED_MORE_DATA (for example after appending more network data).
+// On PLM_RESYNC_OK the decoder is positioned immediately after the picture
+// start code; the normal decode function consumes it.
+
+int plm_video_resync(plm_video_t *self, size_t offset, plm_resync_info_t *info);
+
 
 // Convert the YCrCb data of a frame into interleaved R G B data. The stride
 // specifies the width in bytes of the destination buffer. I.e. the number of
@@ -843,6 +902,7 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self);
 #endif
 
 #define PLM_UNUSED(expr) (void)(expr)
+#define PLM_RESYNC_PTS_HISTORY 64
 #ifdef _MSC_VER
 	#pragma warning(disable:4996)
 #endif
@@ -874,6 +934,14 @@ struct plm_t {
 
 	plm_audio_decode_callback audio_decode_callback;
 	void *audio_decode_callback_user_data;
+
+	int resync_active;
+	size_t resync_source_offset;
+	double first_video_pts;
+	double resync_latest_pts;
+	size_t resync_pts_offsets[PLM_RESYNC_PTS_HISTORY];
+	double resync_pts_values[PLM_RESYNC_PTS_HISTORY];
+	int resync_pts_count;
 };
 
 int plm_init_decoders(plm_t *self);
@@ -911,6 +979,8 @@ plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done) {
 	self->demux = plm_demux_create(buffer, destroy_when_done);
 	self->video_enabled = TRUE;
 	self->audio_enabled = TRUE;
+	self->first_video_pts = PLM_PACKET_INVALID_TS;
+	self->resync_latest_pts = PLM_PACKET_INVALID_TS;
 	plm_init_decoders(self);
 
 	return self;
@@ -1251,6 +1321,36 @@ void plm_read_packets(plm_t *self, int requested_type) {
 	plm_packet_t *packet;
 	while ((packet = plm_demux_decode(self->demux))) {
 		if (packet->type == self->video_packet_type) {
+			if (packet->pts != PLM_PACKET_INVALID_TS) {
+				if (self->first_video_pts == PLM_PACKET_INVALID_TS) {
+					self->first_video_pts = packet->pts;
+				}
+				if (self->resync_active) {
+					self->resync_latest_pts = packet->pts;
+					if (
+						self->resync_pts_count >=
+						PLM_RESYNC_PTS_HISTORY
+					) {
+						int keep = PLM_RESYNC_PTS_HISTORY / 2;
+						memmove(
+							self->resync_pts_offsets,
+							self->resync_pts_offsets + keep,
+							(size_t)keep * sizeof(size_t)
+						);
+						memmove(
+							self->resync_pts_values,
+							self->resync_pts_values + keep,
+							(size_t)keep * sizeof(double)
+						);
+						self->resync_pts_count = keep;
+					}
+					self->resync_pts_offsets[self->resync_pts_count] =
+						plm_buffer_get_size(self->video_buffer);
+					self->resync_pts_values[self->resync_pts_count] =
+						packet->pts;
+					self->resync_pts_count++;
+				}
+			}
 			plm_buffer_write(self->video_buffer, packet->data, packet->length);
 		}
 		else if (packet->type == self->audio_packet_type) {
@@ -1567,6 +1667,9 @@ size_t plm_buffer_write(plm_buffer_t *self, uint8_t *bytes, size_t length) {
 
 void plm_buffer_signal_end(plm_buffer_t *self) {
 	self->total_size = self->length;
+	if (self->length - (self->bit_index >> 3) < 5) {
+		self->has_ended = TRUE;
+	}
 }
 
 void plm_buffer_set_load_callback(plm_buffer_t *self, plm_buffer_load_callback fp, void *user) {
@@ -1595,7 +1698,7 @@ void plm_buffer_seek(plm_buffer_t *self, size_t pos) {
 		self->length = 0;
 		self->total_size = 0;
 	}
-	else if (pos < self->length) {
+	else if (pos <= self->length) {
 		self->bit_index = pos << 3;
 	}
 }
@@ -1650,6 +1753,14 @@ size_t plm_buffer_tell_file_callback(plm_buffer_t *self, void *user) {
 #endif // PLM_NO_STDIO
 
 int plm_buffer_has_ended(plm_buffer_t *self) {
+	if (
+		!self->has_ended &&
+		self->total_size != 0 &&
+		self->length >= self->total_size &&
+		self->length - (self->bit_index >> 3) < 5
+	) {
+		self->has_ended = TRUE;
+	}
 	return self->has_ended;
 }
 
@@ -2278,6 +2389,148 @@ plm_packet_t *plm_demux_get_packet(plm_demux_t *self) {
 }
 
 
+static int plm_resync_count_picture_starts(
+	plm_buffer_t *buffer, size_t start, size_t end
+) {
+	int count = 0;
+	if (end > buffer->length) {
+		end = buffer->length;
+	}
+	if (start > end) {
+		size_t tmp = start;
+		start = end;
+		end = tmp;
+	}
+	for (size_t i = start; i + 6 <= end; i++) {
+		if (
+			buffer->bytes[i] == 0x00 &&
+			buffer->bytes[i + 1] == 0x00 &&
+			buffer->bytes[i + 2] == 0x01 &&
+			buffer->bytes[i + 3] == 0x00
+		) {
+			int type = (buffer->bytes[i + 5] >> 3) & 0x07;
+			if (type >= 1 && type <= 3) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+int plm_resync(plm_t *self, size_t offset, plm_resync_info_t *info) {
+	plm_resync_info_t local_info;
+	if (!info) {
+		info = &local_info;
+	}
+	memset(info, 0, sizeof(plm_resync_info_t));
+
+	if (offset == PLM_RESYNC_CONTINUE) {
+		if (!self->resync_active || !self->video_decoder) {
+			info->status = PLM_RESYNC_BAD_OFFSET;
+			return info->status;
+		}
+	}
+	else {
+		if (!plm_init_decoders(self)) {
+			info->status = PLM_RESYNC_NEED_MORE_DATA;
+			return info->status;
+		}
+		if (!self->video_decoder || !self->video_packet_type) {
+			info->status = PLM_RESYNC_BAD_OFFSET;
+			return info->status;
+		}
+
+		if (self->demux->buffer->mode == PLM_BUFFER_MODE_RING) {
+			if (offset > plm_buffer_get_remaining(self->demux->buffer)) {
+				info->status = PLM_RESYNC_BAD_OFFSET;
+				return info->status;
+			}
+			self->demux->buffer->bit_index =
+				((self->demux->buffer->bit_index >> 3) + offset) << 3;
+			self->demux->current_packet.length = 0;
+			self->demux->next_packet.length = 0;
+			self->demux->start_code = -1;
+		}
+		else {
+			if (offset > plm_buffer_get_size(self->demux->buffer)) {
+				info->status = PLM_RESYNC_BAD_OFFSET;
+				return info->status;
+			}
+
+			plm_demux_buffer_seek(self->demux, offset);
+			if (plm_buffer_tell(self->demux->buffer) != offset) {
+				info->status = PLM_RESYNC_BAD_OFFSET;
+				return info->status;
+			}
+		}
+
+		plm_video_rewind(self->video_decoder);
+		if (self->audio_decoder) {
+			plm_audio_rewind(self->audio_decoder);
+		}
+
+		self->resync_active = TRUE;
+		self->resync_source_offset = offset;
+		self->resync_latest_pts = PLM_PACKET_INVALID_TS;
+		self->resync_pts_count = 0;
+		self->has_ended = FALSE;
+	}
+
+	int status = plm_video_resync(
+		self->video_decoder,
+		offset == PLM_RESYNC_CONTINUE ? PLM_RESYNC_CONTINUE : 0,
+		info
+	);
+
+	info->source_offset = self->resync_source_offset;
+
+	if (status == PLM_RESYNC_OK) {
+		self->resync_active = FALSE;
+
+		double recovered_pts = PLM_PACKET_INVALID_TS;
+		size_t packet_offset = 0;
+		for (int i = self->resync_pts_count - 1; i >= 0; i--) {
+			if (self->resync_pts_offsets[i] <= info->frame_offset) {
+				recovered_pts = self->resync_pts_values[i];
+				packet_offset = self->resync_pts_offsets[i];
+				break;
+			}
+		}
+
+		if (recovered_pts != PLM_PACKET_INVALID_TS) {
+			int pictures_between = plm_resync_count_picture_starts(
+				self->video_buffer, packet_offset, info->frame_offset
+			);
+			double recovered_time = recovered_pts;
+			double framerate = plm_video_get_framerate(self->video_decoder);
+			if (framerate > 0) {
+				recovered_time +=
+					(double)pictures_between /
+					framerate;
+			}
+			double origin = (self->first_video_pts != PLM_PACKET_INVALID_TS)
+				? self->first_video_pts
+				: recovered_time;
+			plm_video_set_time(
+				self->video_decoder,
+				recovered_time - origin
+			);
+			info->time = recovered_time - origin;
+		}
+		else {
+			info->time = plm_video_get_time(self->video_decoder);
+		}
+		self->time = info->time;
+	}
+	else if (status != PLM_RESYNC_NEED_MORE_DATA) {
+		self->resync_active = FALSE;
+	}
+
+	info->status = status;
+	return status;
+}
+
+
 
 // -----------------------------------------------------------------------------
 // plm_video implementation
@@ -2295,6 +2548,10 @@ static const int PLM_START_SLICE_LAST = 0xAF;
 static const int PLM_START_PICTURE = 0x00;
 static const int PLM_START_EXTENSION = 0xB5;
 static const int PLM_START_USER_DATA = 0xB2;
+static const int PLM_START_GOP = 0xB8;
+static const int PLM_START_SEQUENCE_END = 0xB9;
+
+#define PLM_VIDEO_SEQUENCE_HEADER_MAX_BITS (64 + 2 * 64 * 8)
 
 #define PLM_START_IS_SLICE(c) \
 	(c >= PLM_START_SLICE_FIRST && c <= PLM_START_SLICE_LAST)
@@ -2750,6 +3007,16 @@ struct plm_video_t {
 
 	int has_reference_frame;
 	int assume_no_b_frames;
+
+	int resync_active;
+	int resync_mid_known;
+	int resync_started_mid_picture;
+	int resync_pictures_discarded;
+	size_t resync_source_offset;
+	size_t resync_scan_start_bit;
+	size_t resync_bytes_discarded;
+	int resync_previous_discard_read_bytes;
+	int resync_skip_b_until_p;
 };
 
 static inline uint8_t plm_clamp(int n) {
@@ -2841,11 +3108,24 @@ void plm_video_set_time(plm_video_t *self, double time) {
 }
 
 void plm_video_rewind(plm_video_t *self) {
+	if (self->resync_active) {
+		self->buffer->discard_read_bytes =
+			self->resync_previous_discard_read_bytes;
+	}
 	plm_buffer_rewind(self->buffer);
 	self->time = 0;
 	self->frames_decoded = 0;
 	self->has_reference_frame = FALSE;
 	self->start_code = -1;
+	self->resync_active = FALSE;
+	self->resync_mid_known = FALSE;
+	self->resync_started_mid_picture = FALSE;
+	self->resync_pictures_discarded = 0;
+	self->resync_source_offset = 0;
+	self->resync_scan_start_bit = 0;
+	self->resync_bytes_discarded = 0;
+	self->resync_previous_discard_read_bytes = TRUE;
+	self->resync_skip_b_until_p = FALSE;
 }
 
 int plm_video_has_ended(plm_video_t *self) {
@@ -2897,6 +3177,15 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 		
 		plm_video_decode_picture(self);
 
+		if (self->resync_skip_b_until_p) {
+			if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_B) {
+				continue;
+			}
+			if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE) {
+				self->resync_skip_b_until_p = FALSE;
+			}
+		}
+
 		if (self->assume_no_b_frames) {
 			frame = &self->frame_backward;
 		}
@@ -2916,6 +3205,276 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 	self->time = (double)self->frames_decoded / self->framerate;
 	
 	return frame;
+}
+
+static int plm_video_resync_read_picture_type(
+	plm_video_t *self, size_t picture_start_bit, int *picture_type
+) {
+	self->buffer->bit_index = picture_start_bit + 32;
+	if (!plm_buffer_has(self->buffer, 13)) {
+		return FALSE;
+	}
+	plm_buffer_skip(self->buffer, 10);
+	*picture_type = plm_buffer_read(self->buffer, 3);
+	return TRUE;
+}
+
+static int plm_video_resync_picture_complete(
+	plm_video_t *self, size_t picture_start_bit,
+	size_t *next_start_bit, int *has_slice
+) {
+	int code;
+	*has_slice = FALSE;
+	self->buffer->bit_index = picture_start_bit + 32;
+
+	while ((code = plm_buffer_next_start_code(self->buffer)) != -1) {
+		if (PLM_START_IS_SLICE(code)) {
+			*has_slice = TRUE;
+			continue;
+		}
+		if (
+			code == PLM_START_PICTURE ||
+			code == PLM_START_SEQUENCE ||
+			code == PLM_START_GOP ||
+			code == PLM_START_SEQUENCE_END
+		) {
+			*next_start_bit =
+				((self->buffer->bit_index >> 3) - 4) << 3;
+			return TRUE;
+		}
+	}
+
+	if (plm_buffer_has_ended(self->buffer)) {
+		*next_start_bit = self->buffer->length << 3;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static void plm_video_resync_check_partial_prefix(plm_video_t *self) {
+	if (self->resync_mid_known) {
+		return;
+	}
+
+	size_t byte_pos = self->resync_scan_start_bit >> 3;
+	if (self->buffer->length < byte_pos + 4) {
+		return;
+	}
+
+	uint8_t *bytes = self->buffer->bytes + byte_pos;
+	if (
+		bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && (
+			bytes[3] == PLM_START_PICTURE ||
+			bytes[3] == PLM_START_SEQUENCE ||
+			bytes[3] == PLM_START_GOP ||
+			bytes[3] == PLM_START_SEQUENCE_END
+		)
+	) {
+		self->resync_started_mid_picture = FALSE;
+	}
+	else {
+		self->resync_started_mid_picture = TRUE;
+	}
+	self->resync_mid_known = TRUE;
+}
+
+int plm_video_resync(plm_video_t *self, size_t offset, plm_resync_info_t *info) {
+	plm_resync_info_t local_info;
+	if (!info) {
+		info = &local_info;
+	}
+	memset(info, 0, sizeof(plm_resync_info_t));
+
+	if (offset == PLM_RESYNC_CONTINUE) {
+		if (!self->resync_active) {
+			info->status = PLM_RESYNC_BAD_OFFSET;
+			return info->status;
+		}
+	}
+	else {
+		if (self->resync_active) {
+			self->buffer->discard_read_bytes =
+				self->resync_previous_discard_read_bytes;
+			self->resync_active = FALSE;
+		}
+
+		size_t size = plm_buffer_get_size(self->buffer);
+		if (offset > size) {
+			info->status = PLM_RESYNC_BAD_OFFSET;
+			return info->status;
+		}
+
+		plm_buffer_seek(self->buffer, offset);
+		if (plm_buffer_tell(self->buffer) != offset) {
+			info->status = PLM_RESYNC_BAD_OFFSET;
+			return info->status;
+		}
+
+		self->start_code = -1;
+		self->resync_active = TRUE;
+		self->resync_mid_known = FALSE;
+		self->resync_started_mid_picture = FALSE;
+		self->resync_pictures_discarded = 0;
+		self->resync_source_offset = offset;
+		self->resync_scan_start_bit = self->buffer->bit_index;
+		self->resync_bytes_discarded = 0;
+		self->resync_previous_discard_read_bytes =
+			self->buffer->discard_read_bytes;
+	}
+
+	size_t call_start_byte = self->buffer->bit_index >> 3;
+	self->buffer->discard_read_bytes = FALSE;
+
+	for (;;) {
+		plm_video_resync_check_partial_prefix(self);
+
+		int code = plm_buffer_next_start_code(self->buffer);
+		if (code == -1) {
+			self->resync_bytes_discarded +=
+				(self->buffer->bit_index >> 3) - call_start_byte;
+
+			if (plm_buffer_has_ended(self->buffer)) {
+				self->resync_active = FALSE;
+				self->buffer->discard_read_bytes =
+					self->resync_previous_discard_read_bytes;
+				info->status = PLM_RESYNC_END_OF_STREAM;
+			}
+			else {
+				info->status = PLM_RESYNC_NEED_MORE_DATA;
+			}
+
+			info->source_offset = self->resync_source_offset;
+			info->frame_offset = plm_buffer_tell(self->buffer);
+			info->picture_type = 0;
+			info->pictures_discarded = self->resync_pictures_discarded;
+			info->frames_lost = self->resync_pictures_discarded +
+				self->resync_started_mid_picture;
+			info->bytes_discarded = self->resync_bytes_discarded;
+			info->time = self->time;
+			return info->status;
+		}
+
+		size_t code_start_bit =
+			((self->buffer->bit_index >> 3) - 4) << 3;
+
+		if (code == PLM_START_SEQUENCE) {
+			if (!plm_buffer_has(
+				self->buffer,
+				PLM_VIDEO_SEQUENCE_HEADER_MAX_BITS
+			)) {
+				self->buffer->bit_index = code_start_bit;
+				self->resync_bytes_discarded +=
+					(code_start_bit >> 3) - call_start_byte;
+				info->status = PLM_RESYNC_NEED_MORE_DATA;
+				info->source_offset = self->resync_source_offset;
+				info->frame_offset = plm_buffer_tell(self->buffer);
+				info->pictures_discarded =
+					self->resync_pictures_discarded;
+				info->frames_lost = self->resync_pictures_discarded +
+					self->resync_started_mid_picture;
+				info->bytes_discarded = self->resync_bytes_discarded;
+				info->time = self->time;
+				return info->status;
+			}
+
+			if (
+				!plm_video_decode_sequence_header(self) ||
+				self->framerate <= 0
+			) {
+				continue;
+			}
+			continue;
+		}
+
+		if (code == PLM_START_PICTURE) {
+			int picture_type = 0;
+			if (!plm_video_resync_read_picture_type(
+				self, code_start_bit, &picture_type
+			)) {
+				self->buffer->bit_index = code_start_bit;
+				self->resync_bytes_discarded +=
+					(code_start_bit >> 3) - call_start_byte;
+				info->status = PLM_RESYNC_NEED_MORE_DATA;
+				info->source_offset = self->resync_source_offset;
+				info->frame_offset = plm_buffer_tell(self->buffer);
+				info->pictures_discarded =
+					self->resync_pictures_discarded;
+				info->frames_lost = self->resync_pictures_discarded +
+					self->resync_started_mid_picture;
+				info->bytes_discarded = self->resync_bytes_discarded;
+				info->time = self->time;
+				return info->status;
+			}
+
+			size_t next_start_bit = 0;
+			int has_slice = FALSE;
+			if (!plm_video_resync_picture_complete(
+				self, code_start_bit, &next_start_bit, &has_slice
+			)) {
+				self->buffer->bit_index = code_start_bit;
+				self->resync_bytes_discarded +=
+					(code_start_bit >> 3) - call_start_byte;
+				info->status = PLM_RESYNC_NEED_MORE_DATA;
+				info->source_offset = self->resync_source_offset;
+				info->frame_offset = plm_buffer_tell(self->buffer);
+				info->pictures_discarded =
+					self->resync_pictures_discarded;
+				info->frames_lost = self->resync_pictures_discarded +
+					self->resync_started_mid_picture;
+				info->bytes_discarded = self->resync_bytes_discarded;
+				info->time = self->time;
+				return info->status;
+			}
+
+			if (
+				picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA &&
+				has_slice &&
+				self->has_sequence_header
+			) {
+				plm_video_resync_check_partial_prefix(self);
+				if (!self->resync_mid_known) {
+					self->resync_started_mid_picture =
+						code_start_bit != self->resync_scan_start_bit;
+					self->resync_mid_known = TRUE;
+				}
+
+				self->resync_bytes_discarded +=
+					(code_start_bit >> 3) - call_start_byte;
+				self->buffer->bit_index = code_start_bit + 32;
+				self->buffer->discard_read_bytes =
+					self->resync_previous_discard_read_bytes;
+				self->start_code = PLM_START_PICTURE;
+				self->has_reference_frame = FALSE;
+				self->picture_type = picture_type;
+				self->resync_skip_b_until_p = TRUE;
+
+				int frames_lost = self->resync_pictures_discarded +
+					self->resync_started_mid_picture;
+				self->frames_decoded += frames_lost;
+				self->time = frames_lost
+					? (double)self->frames_decoded / self->framerate
+					: self->time;
+
+				self->resync_active = FALSE;
+
+				info->status = PLM_RESYNC_OK;
+				info->source_offset = self->resync_source_offset;
+				info->frame_offset =
+					plm_buffer_tell(self->buffer) - 4;
+				info->picture_type = picture_type;
+				info->pictures_discarded =
+					self->resync_pictures_discarded;
+				info->frames_lost = frames_lost;
+				info->bytes_discarded = self->resync_bytes_discarded;
+				info->time = self->time;
+				return info->status;
+			}
+
+			self->resync_pictures_discarded++;
+			self->buffer->bit_index = next_start_bit;
+			continue;
+		}
+	}
 }
 
 int plm_video_has_header(plm_video_t *self) {
@@ -2938,7 +3497,7 @@ int plm_video_has_header(plm_video_t *self) {
 }
 
 int plm_video_decode_sequence_header(plm_video_t *self) {
-	int max_header_size = 64 + 2 * 64 * 8; // 64 bit header + 2x 64 byte matrix
+	int max_header_size = PLM_VIDEO_SEQUENCE_HEADER_MAX_BITS;
 	if (!plm_buffer_has(self->buffer, max_header_size)) {
 		return FALSE;
 	}
@@ -3009,6 +3568,9 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
 	size_t frame_data_size = (luma_plane_size + 2 * chroma_plane_size);
 
+	if (self->has_sequence_header) {
+		PLM_FREE(self->frames_data);
+	}
 	self->frames_data = (uint8_t*)PLM_MALLOC(frame_data_size * 3);
 	plm_video_init_frame(self, &self->frame_current, self->frames_data + frame_data_size * 0);
 	plm_video_init_frame(self, &self->frame_forward, self->frames_data + frame_data_size * 1);
