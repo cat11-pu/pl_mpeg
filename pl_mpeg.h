@@ -170,6 +170,27 @@ typedef struct plm_audio_t plm_audio_t;
 
 #define PLM_PACKET_INVALID_TS -1
 
+// Decoder status / error codes returned by plm_decode_video_ex() and the
+// plm_video_decode_ex() low level API.
+//
+// PLM_OK                       - a frame was decoded and returned
+// PLM_ERROR_TRY_AGAIN         - not enough buffered data yet, feed more bytes
+// PLM_ERROR_MISSING_REFERENCE - a P/B frame referenced a frame that was never
+//                                decoded (e.g. lost packet); the frame was
+//                                skipped without producing any output
+// PLM_ERROR_CORRUPT           - structural/bitstream error in the frame; the
+//                                frame was skipped to stay within bounds
+// PLM_ERROR_END               - the source has ended
+
+#define PLM_OK 0
+#define PLM_ERROR_TRY_AGAIN 1
+#define PLM_ERROR_MISSING_REFERENCE 2
+#define PLM_ERROR_CORRUPT 3
+#define PLM_ERROR_END 4
+
+// Human readable name for an error code, useful for logging.
+const char *plm_error_name(int code);
+
 typedef struct {
 	int type;
 	double pts;
@@ -429,6 +450,26 @@ void plm_decode(plm_t *self, double seconds);
 // or until plm_destroy() is called.
 
 plm_frame_t *plm_decode_video(plm_t *self);
+
+// Same as plm_decode_video(), but reports why no frame is returned through
+// the error code out-parameter. On success *error is PLM_OK and a frame is
+// returned. When a reference frame is missing or the bitstream is corrupt,
+// NULL is returned with PLM_ERROR_MISSING_REFERENCE / PLM_ERROR_CORRUPT and
+// no partially decoded frame is exposed. PLM_ERROR_TRY_AGAIN means more data
+// has to be fed before another picture can be decoded; PLM_ERROR_END marks
+// the end of the source. Pass NULL for error if you don't need the code.
+
+plm_frame_t *plm_decode_video_ex(plm_t *self, int *error);
+
+// Picture coding type (1=I, 2=P, 3=B) of the picture most recently processed,
+// including skipped ones. 0 if no picture has been processed yet.
+
+int plm_get_last_picture_type(plm_t *self);
+
+// Number of pictures skipped since creation/rewind because their reference
+// frame was missing or their bitstream was corrupt.
+
+int plm_get_skipped_frame_count(plm_t *self);
 
 
 // Decode and return one audio frame. Returns NULL if no frame could be decoded
@@ -728,6 +769,8 @@ void plm_video_rewind(plm_video_t *self);
 // Get whether the file has ended. This will be cleared on rewind.
 
 int plm_video_has_ended(plm_video_t *self);
+int plm_video_get_last_picture_type(plm_video_t *self);
+int plm_video_get_skipped_frame_count(plm_video_t *self);
 
 
 // Decode and return one frame of video and advance the internal time by 
@@ -735,6 +778,12 @@ int plm_video_has_ended(plm_video_t *self);
 // plm_video_decode() or until the video decoder is destroyed.
 
 plm_frame_t *plm_video_decode(plm_video_t *self);
+
+// Same as plm_video_decode(), but reports a PLM_ERROR_* code when no frame
+// is returned. A missing reference or corrupt picture is skipped and never
+// produces a partially decoded frame.
+
+plm_frame_t *plm_video_decode_ex(plm_video_t *self, int *error);
 
 
 // Convert the YCrCb data of a frame into interleaved R G B data. The stride
@@ -1189,22 +1238,80 @@ void plm_decode(plm_t *self, double tick) {
 }
 
 plm_frame_t *plm_decode_video(plm_t *self) {
+	// Backward compatible entry point: keep decoding across skipped/corrupt
+	// pictures so callers using a simple while(plm_decode_video()) loop keep
+	// working and never receive a half-decided frame. Only return NULL when a
+	// real frame is produced, the source ends or more data is required.
+	for (;;) {
+		int error = PLM_OK;
+		plm_frame_t *frame = plm_decode_video_ex(self, &error);
+		if (frame) {
+			return frame;
+		}
+		if (error == PLM_ERROR_MISSING_REFERENCE || error == PLM_ERROR_CORRUPT) {
+			continue;
+		}
+		return NULL;
+	}
+}
+
+plm_frame_t *plm_decode_video_ex(plm_t *self, int *error) {
+	if (error) {
+		*error = PLM_OK;
+	}
 	if (!plm_init_decoders(self)) {
+		if (error) {
+			*error = PLM_ERROR_TRY_AGAIN;
+		}
 		return NULL;
 	}
 
 	if (!self->video_packet_type) {
+		if (error) {
+			*error = PLM_ERROR_END;
+		}
 		return NULL;
 	}
 
-	plm_frame_t *frame = plm_video_decode(self->video_decoder);
+	plm_frame_t *frame = plm_video_decode_ex(self->video_decoder, error);
 	if (frame) {
 		self->time = frame->time;
 	}
-	else if (plm_demux_has_ended(self->demux)) {
+	else if (
+		error && (
+			*error == PLM_ERROR_END ||
+			(*error == PLM_ERROR_TRY_AGAIN && plm_demux_has_ended(self->demux))
+		)
+	) {
 		plm_handle_end(self);
+		*error = PLM_ERROR_END;
 	}
 	return frame;
+}
+
+int plm_get_last_picture_type(plm_t *self) {
+	if (!self->video_decoder) {
+		return 0;
+	}
+	return plm_video_get_last_picture_type(self->video_decoder);
+}
+
+int plm_get_skipped_frame_count(plm_t *self) {
+	if (!self->video_decoder) {
+		return 0;
+	}
+	return plm_video_get_skipped_frame_count(self->video_decoder);
+}
+
+const char *plm_error_name(int code) {
+	switch (code) {
+		case PLM_OK: return "PLM_OK";
+		case PLM_ERROR_TRY_AGAIN: return "PLM_ERROR_TRY_AGAIN";
+		case PLM_ERROR_MISSING_REFERENCE: return "PLM_ERROR_MISSING_REFERENCE";
+		case PLM_ERROR_CORRUPT: return "PLM_ERROR_CORRUPT";
+		case PLM_ERROR_END: return "PLM_ERROR_END";
+		default: return "PLM_ERROR_UNKNOWN";
+	}
 }
 
 plm_samples_t *plm_decode_audio(plm_t *self) {
@@ -2750,6 +2857,24 @@ struct plm_video_t {
 
 	int has_reference_frame;
 	int assume_no_b_frames;
+
+	// Error handling for lost/corrupt reference frames.
+	// reference_valid: FALSE until the first I-frame has been fully decoded.
+	//                 A P/B frame decoded while this is FALSE must be skipped.
+	// picture_error : set by the slice/macroblock layer on any structural
+	//                 error, checked after decoding a picture.
+	// last_error    : sticky status of the most recent decode attempt.
+	int reference_valid;
+	int picture_error;
+	int last_error;
+	int skipped_frame_count;
+	int output_picture_type;
+	int queued_picture_type;
+	// Stays non-zero from the first lost/corrupt picture until an I-frame has
+	// been decoded *and* the following P-frame completes the forward/backward
+	// reference pair. A B-frame needs both references, so it is suppressed
+	// until the chain is fully rebuilt, even once reference_valid is set.
+	int skipped_since_intra;
 };
 
 static inline uint8_t plm_clamp(int n) {
@@ -2764,7 +2889,9 @@ static inline uint8_t plm_clamp(int n) {
 
 int plm_video_decode_sequence_header(plm_video_t *self);
 void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base);
+void plm_video_decode_picture_header(plm_video_t *self);
 void plm_video_decode_picture(plm_video_t *self);
+void plm_video_skip_picture(plm_video_t *self);
 void plm_video_decode_slice(plm_video_t *self, int slice);
 void plm_video_decode_macroblock(plm_video_t *self);
 void plm_video_decode_motion_vectors(plm_video_t *self);
@@ -2846,14 +2973,48 @@ void plm_video_rewind(plm_video_t *self) {
 	self->frames_decoded = 0;
 	self->has_reference_frame = FALSE;
 	self->start_code = -1;
+	self->reference_valid = FALSE;
+	self->picture_error = FALSE;
+	self->last_error = PLM_OK;
+	self->skipped_frame_count = 0;
+	self->output_picture_type = 0;
+	self->skipped_since_intra = 0;
 }
 
 int plm_video_has_ended(plm_video_t *self) {
 	return plm_buffer_has_ended(self->buffer);
 }
 
+int plm_video_get_last_picture_type(plm_video_t *self) {
+	return self->output_picture_type;
+}
+
+int plm_video_get_skipped_frame_count(plm_video_t *self) {
+	return self->skipped_frame_count;
+}
+
+static int plm_video_picture_needs_reference(plm_video_t *self) {
+	return (
+		self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE ||
+		self->picture_type == PLM_VIDEO_PICTURE_TYPE_B
+	);
+}
+
 plm_frame_t *plm_video_decode(plm_video_t *self) {
+	return plm_video_decode_ex(self, NULL);
+}
+
+plm_frame_t *plm_video_decode_ex(plm_video_t *self, int *error) {
+	if (error) {
+		*error = PLM_OK;
+	}
+	self->last_error = PLM_OK;
+
 	if (!plm_video_has_header(self)) {
+		self->last_error = PLM_ERROR_TRY_AGAIN;
+		if (error) {
+			*error = PLM_ERROR_TRY_AGAIN;
+		}
 		return NULL;
 	}
 	
@@ -2875,9 +3036,16 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 				) {
 					self->has_reference_frame = FALSE;
 					frame = &self->frame_backward;
+					self->output_picture_type = self->picture_type;
 					break;
 				}
 
+				self->last_error = plm_buffer_has_ended(self->buffer)
+					? PLM_ERROR_END
+					: PLM_ERROR_TRY_AGAIN;
+				if (error) {
+					*error = self->last_error;
+				}
 				return NULL;
 			}
 		}
@@ -2891,23 +3059,113 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 			plm_buffer_has_start_code(self->buffer, PLM_START_PICTURE) == -1 &&
 			!plm_buffer_has_ended(self->buffer)
 		) {
+			self->last_error = PLM_ERROR_TRY_AGAIN;
+			if (error) {
+				*error = PLM_ERROR_TRY_AGAIN;
+			}
 			return NULL;
 		}
 		plm_buffer_discard_read_bytes(self->buffer);
-		
+
+		// A predictive or bidirectional frame without a valid reference can
+		// only produce garbage and is dangerous to motion-compensate against
+		// uninitialized/rotated planes. Read the picture header to learn its
+		// type, then skip the whole picture and report the loss explicitly.
+		self->picture_error = FALSE;
+		plm_video_decode_picture_header(self);
+
+		// Unsupported coding type (D frames, zero f_code, ...). Skip without
+		// touching the frame planes.
+		if (self->picture_type <= 0 || self->picture_type > PLM_VIDEO_PICTURE_TYPE_B) {
+			plm_video_skip_picture(self);
+			self->last_error = PLM_ERROR_CORRUPT;
+			self->skipped_frame_count++;
+			if (error) {
+				*error = self->last_error;
+			}
+			return NULL;
+		}
+
+		int missing_reference =
+			(plm_video_picture_needs_reference(self) && !self->reference_valid) ||
+			// A B-frame after any loss still points backward at the dropped
+			// chain until a fresh, complete GOP is in place.
+			(self->picture_type == PLM_VIDEO_PICTURE_TYPE_B &&
+				self->skipped_since_intra > 0);
+
+		if (missing_reference) {
+			plm_video_skip_picture(self);
+			self->skipped_since_intra++;
+			self->last_error = PLM_ERROR_MISSING_REFERENCE;
+			self->skipped_frame_count++;
+			if (error) {
+				*error = self->last_error;
+			}
+			return NULL;
+		}
+
 		plm_video_decode_picture(self);
 
+		// Structural bitstream error (out of range macroblocks, truncated
+		// slices, etc.). Never expose the half-decoded picture; drop it and
+		// invalidate the reference chain until the next I-frame.
+		if (self->picture_error) {
+			// decode_picture() already advanced to the next start code; only
+			// scan to the boundary if the error stopped us mid-slice.
+			while (PLM_START_IS_SLICE(self->start_code)) {
+				self->start_code = plm_buffer_next_start_code(self->buffer);
+				if (self->start_code == -1) {
+					break;
+				}
+			}
+			self->reference_valid = FALSE;
+			self->has_reference_frame = FALSE;
+			self->skipped_since_intra++;
+			self->last_error = PLM_ERROR_CORRUPT;
+			self->skipped_frame_count++;
+			if (error) {
+				*error = self->last_error;
+			}
+			return NULL;
+		}
+
+		// A fully decoded I-frame (re)establishes a valid reference; a P-frame
+		// only keeps the chain valid, it can never restore it. The B-frame
+		// gate is cleared only after the first P following a recovery I,
+		// because B-frames decoded right after that I still reference the
+		// dropped chain through their backward pointer.
+		if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA) {
+			self->reference_valid = TRUE;
+		}
+		else if (
+			self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE &&
+			self->reference_valid
+		) {
+			self->skipped_since_intra = 0;
+		}
+
+		int current_reference_type = self->picture_type;
 		if (self->assume_no_b_frames) {
 			frame = &self->frame_backward;
+			self->output_picture_type = self->picture_type;
 		}
 		else if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_B) {
 			frame = &self->frame_current;
+			self->output_picture_type = PLM_VIDEO_PICTURE_TYPE_B;
 		}
 		else if (self->has_reference_frame) {
 			frame = &self->frame_forward;
+			// frame_forward holds the previously decoded reference picture
+			self->output_picture_type = self->queued_picture_type;
 		}
 		else {
 			self->has_reference_frame = TRUE;
+		}
+		if (
+			current_reference_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
+			current_reference_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE
+		) {
+			self->queued_picture_type = current_reference_type;
 		}
 	} while (!frame);
 	
@@ -3037,7 +3295,7 @@ void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base) 
 	frame->cb.data = base + luma_plane_size + chroma_plane_size;
 }
 
-void plm_video_decode_picture(plm_video_t *self) {
+void plm_video_decode_picture_header(plm_video_t *self) {
 	plm_buffer_skip(self->buffer, 10); // skip temporalReference
 	self->picture_type = plm_buffer_read(self->buffer, 3);
 	plm_buffer_skip(self->buffer, 16); // skip vbv_delay
@@ -3055,7 +3313,8 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->motion_forward.full_px = plm_buffer_read(self->buffer, 1);
 		int f_code = plm_buffer_read(self->buffer, 3);
 		if (f_code == 0) {
-			// Ignore picture with zero f_code
+			// Mark unsupported picture so the caller skips it
+			self->picture_type = 0;
 			return;
 		}
 		self->motion_forward.r_size = f_code - 1;
@@ -3066,12 +3325,35 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->motion_backward.full_px = plm_buffer_read(self->buffer, 1);
 		int f_code = plm_buffer_read(self->buffer, 3);
 		if (f_code == 0) {
-			// Ignore picture with zero f_code
+			// Mark unsupported picture so the caller skips it
+			self->picture_type = 0;
 			return;
 		}
 		self->motion_backward.r_size = f_code - 1;
 	}
+}
 
+void plm_video_skip_picture(plm_video_t *self) {
+	// Advance to the first slice (or the next start code) without touching
+	// any frame planes, then consume the rest of the picture by scanning for
+	// the following picture/sequence start code. This keeps the bitstream
+	// position correct and never reads out of bounds.
+	do {
+		self->start_code = plm_buffer_next_start_code(self->buffer);
+	} while (
+		self->start_code == PLM_START_EXTENSION ||
+		self->start_code == PLM_START_USER_DATA
+	);
+
+	while (PLM_START_IS_SLICE(self->start_code)) {
+		self->start_code = plm_buffer_next_start_code(self->buffer);
+		if (self->start_code == -1) {
+			break;
+		}
+	}
+}
+
+void plm_video_decode_picture(plm_video_t *self) {
 	plm_frame_t frame_temp = self->frame_forward;
 	if (
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
@@ -3092,6 +3374,9 @@ void plm_video_decode_picture(plm_video_t *self) {
 	// Decode all slices
 	while (PLM_START_IS_SLICE(self->start_code)) {
 		plm_video_decode_slice(self, self->start_code & 0x000000FF);
+		if (self->picture_error) {
+			break;
+		}
 		if (self->macroblock_address >= self->mb_size - 1) {
 			break;
 		}
@@ -3129,6 +3414,7 @@ void plm_video_decode_slice(plm_video_t *self, int slice) {
 	do {
 		plm_video_decode_macroblock(self);
 	} while (
+		!self->picture_error &&
 		self->macroblock_address < self->mb_size - 1 &&
 		plm_buffer_peek_non_zero(self->buffer, 23)
 	);
@@ -3159,6 +3445,7 @@ void plm_video_decode_macroblock(plm_video_t *self) {
 	}
 	else {
 		if (self->macroblock_address + increment >= self->mb_size) {
+			self->picture_error = TRUE;
 			return; // invalid
 		}
 		if (increment > 1) {
@@ -3190,6 +3477,7 @@ void plm_video_decode_macroblock(plm_video_t *self) {
 	self->mb_col = self->macroblock_address % self->mb_width;
 
 	if (self->mb_col >= self->mb_width || self->mb_row >= self->mb_height) {
+		self->picture_error = TRUE;
 		return; // corrupt stream;
 	}
 
@@ -3288,8 +3576,8 @@ void plm_video_predict_macroblock(plm_video_t *self) {
 	int fw_v = self->motion_forward.v;
 
 	if (self->motion_forward.full_px) {
-		fw_h <<= 1;
-		fw_v <<= 1;
+		fw_h *= 2;
+		fw_v *= 2;
 	}
 
 	if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_B) {
@@ -3297,8 +3585,8 @@ void plm_video_predict_macroblock(plm_video_t *self) {
 		int bw_v = self->motion_backward.v;
 
 		if (self->motion_backward.full_px) {
-			bw_h <<= 1;
-			bw_v <<= 1;
+			bw_h *= 2;
+			bw_v *= 2;
 		}
 
 		if (self->motion_forward.is_set) {
@@ -3347,19 +3635,38 @@ void plm_video_process_macroblock(
 	int motion_h, int motion_v, int block_size, int interpolate
 ) {
 	int dw = self->mb_width * block_size;
+	int dh = self->mb_height * block_size;
 
 	int hp = motion_h >> 1;
 	int vp = motion_v >> 1;
 	int odd_h = (motion_h & 1) == 1;
 	int odd_v = (motion_v & 1) == 1;
 
-	unsigned int si = ((self->mb_row * block_size) + vp) * dw + (self->mb_col * block_size) + hp;
-	unsigned int di = (self->mb_row * dw + self->mb_col) * block_size;
-	
-	unsigned int max_address = (dw * (self->mb_height * block_size - block_size + 1) - block_size);
-	if (si > max_address || di > max_address) {
+	int src_x = (self->mb_col * block_size) + hp;
+	int src_y = (self->mb_row * block_size) + vp;
+	int dst_x = self->mb_col * block_size;
+	int dst_y = self->mb_row * block_size;
+
+	// Half-pel interpolation reads one extra column (odd_h) and one extra
+	// row (odd_v) beyond the block. Validate the full accessed rectangle of
+	// both the source and the destination against the plane dimensions so
+	// no read or write can ever leave the allocated planes.
+	int src_right = src_x + block_size - 1 + (odd_h ? 1 : 0);
+	int src_bottom = src_y + block_size - 1 + (odd_v ? 1 : 0);
+	int dst_right = dst_x + block_size - 1;
+	int dst_bottom = dst_y + block_size - 1;
+
+	if (
+		src_x < 0 || src_y < 0 || dst_x < 0 || dst_y < 0 ||
+		src_right >= dw || src_bottom >= dh ||
+		dst_right >= dw || dst_bottom >= dh
+	) {
+		self->picture_error = TRUE;
 		return; // corrupt video
 	}
+
+	unsigned int si = (unsigned int)(src_y * dw + src_x);
+	unsigned int di = (unsigned int)(dst_y * dw + dst_x);
 
 	#define PLM_MB_CASE(INTERPOLATE, ODD_H, ODD_V, OP) \
 		case ((INTERPOLATE << 2) | (ODD_H << 1) | (ODD_V)): \
@@ -3414,7 +3721,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		self->dc_predictor[plane_index] = self->block_data[0];
 
 		// Dequantize + premultiply
-		self->block_data[0] <<= (3 + 5);
+		self->block_data[0] = self->block_data[0] * 256;
 
 		quant_matrix = self->intra_quant_matrix;
 		n = 1;
@@ -3457,6 +3764,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 
 		n += run;
 		if (n < 0 || n >= 64) {
+			self->picture_error = TRUE;
 			return; // invalid
 		}
 
@@ -3464,7 +3772,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		n++;
 
 		// Dequantize, oddify, clip
-		level = (unsigned)level << 1;
+		level = level * 2; // signed multiply avoids left-shift UB on negatives
 		if (!self->macroblock_intra) {
 			level += (level < 0 ? -1 : 1);
 		}
