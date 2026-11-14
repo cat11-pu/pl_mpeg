@@ -1676,6 +1676,23 @@ int plm_buffer_read(plm_buffer_t *self, int count) {
 	if (!plm_buffer_has(self, count)) {
 		return 0;
 	}
+	if (count == 0) {
+		return 0;
+	}
+
+	// Fast path: up to 25 bits span at most four bytes at any bit offset.
+	if (count <= 25) {
+		size_t bit_index = self->bit_index;
+		const uint8_t *p = self->bytes + (bit_index >> 3);
+		uint32_t value = ((uint32_t)p[0] << 24)
+			| ((uint32_t)p[1] << 16)
+			| ((uint32_t)p[2] << 8)
+			| p[3];
+		int shift = (int)(bit_index & 7);
+		value = (value >> (32 - shift - count)) & ((UINT32_C(1) << count) - 1);
+		self->bit_index = bit_index + count;
+		return (int)value;
+	}
 
 	int value = 0;
 	while (count) {
@@ -2575,120 +2592,122 @@ static const plm_vlc_t *PLM_VIDEO_DCT_SIZE[] = {
 
 //  Decoded values are unsigned. Sign bit follows in the stream.
 
-static const plm_vlc_uint_t PLM_VIDEO_DCT_COEFF[] = {
-	{  1 << 1,        0}, {       0,   0x0001},  //   0: x
-	{  2 << 1,        0}, {  3 << 1,        0},  //   1: 0x
-	{  4 << 1,        0}, {  5 << 1,        0},  //   2: 00x
-	{  6 << 1,        0}, {       0,   0x0101},  //   3: 01x
-	{  7 << 1,        0}, {  8 << 1,        0},  //   4: 000x
-	{  9 << 1,        0}, { 10 << 1,        0},  //   5: 001x
-	{       0,   0x0002}, {       0,   0x0201},  //   6: 010x
-	{ 11 << 1,        0}, { 12 << 1,        0},  //   7: 0000x
-	{ 13 << 1,        0}, { 14 << 1,        0},  //   8: 0001x
-	{ 15 << 1,        0}, {       0,   0x0003},  //   9: 0010x
-	{       0,   0x0401}, {       0,   0x0301},  //  10: 0011x
-	{ 16 << 1,        0}, {       0,   0xffff},  //  11: 0000 0x
-	{ 17 << 1,        0}, { 18 << 1,        0},  //  12: 0000 1x
-	{       0,   0x0701}, {       0,   0x0601},  //  13: 0001 0x
-	{       0,   0x0102}, {       0,   0x0501},  //  14: 0001 1x
-	{ 19 << 1,        0}, { 20 << 1,        0},  //  15: 0010 0x
-	{ 21 << 1,        0}, { 22 << 1,        0},  //  16: 0000 00x
-	{       0,   0x0202}, {       0,   0x0901},  //  17: 0000 10x
-	{       0,   0x0004}, {       0,   0x0801},  //  18: 0000 11x
-	{ 23 << 1,        0}, { 24 << 1,        0},  //  19: 0010 00x
-	{ 25 << 1,        0}, { 26 << 1,        0},  //  20: 0010 01x
-	{ 27 << 1,        0}, { 28 << 1,        0},  //  21: 0000 000x
-	{ 29 << 1,        0}, { 30 << 1,        0},  //  22: 0000 001x
-	{       0,   0x0d01}, {       0,   0x0006},  //  23: 0010 000x
-	{       0,   0x0c01}, {       0,   0x0b01},  //  24: 0010 001x
-	{       0,   0x0302}, {       0,   0x0103},  //  25: 0010 010x
-	{       0,   0x0005}, {       0,   0x0a01},  //  26: 0010 011x
-	{ 31 << 1,        0}, { 32 << 1,        0},  //  27: 0000 0000x
-	{ 33 << 1,        0}, { 34 << 1,        0},  //  28: 0000 0001x
-	{ 35 << 1,        0}, { 36 << 1,        0},  //  29: 0000 0010x
-	{ 37 << 1,        0}, { 38 << 1,        0},  //  30: 0000 0011x
-	{ 39 << 1,        0}, { 40 << 1,        0},  //  31: 0000 0000 0x
-	{ 41 << 1,        0}, { 42 << 1,        0},  //  32: 0000 0000 1x
-	{ 43 << 1,        0}, { 44 << 1,        0},  //  33: 0000 0001 0x
-	{ 45 << 1,        0}, { 46 << 1,        0},  //  34: 0000 0001 1x
-	{       0,   0x1001}, {       0,   0x0502},  //  35: 0000 0010 0x
-	{       0,   0x0007}, {       0,   0x0203},  //  36: 0000 0010 1x
-	{       0,   0x0104}, {       0,   0x0f01},  //  37: 0000 0011 0x
-	{       0,   0x0e01}, {       0,   0x0402},  //  38: 0000 0011 1x
-	{ 47 << 1,        0}, { 48 << 1,        0},  //  39: 0000 0000 00x
-	{ 49 << 1,        0}, { 50 << 1,        0},  //  40: 0000 0000 01x
-	{ 51 << 1,        0}, { 52 << 1,        0},  //  41: 0000 0000 10x
-	{ 53 << 1,        0}, { 54 << 1,        0},  //  42: 0000 0000 11x
-	{ 55 << 1,        0}, { 56 << 1,        0},  //  43: 0000 0001 00x
-	{ 57 << 1,        0}, { 58 << 1,        0},  //  44: 0000 0001 01x
-	{ 59 << 1,        0}, { 60 << 1,        0},  //  45: 0000 0001 10x
-	{ 61 << 1,        0}, { 62 << 1,        0},  //  46: 0000 0001 11x
-	{      -1,        0}, { 63 << 1,        0},  //  47: 0000 0000 000x
-	{ 64 << 1,        0}, { 65 << 1,        0},  //  48: 0000 0000 001x
-	{ 66 << 1,        0}, { 67 << 1,        0},  //  49: 0000 0000 010x
-	{ 68 << 1,        0}, { 69 << 1,        0},  //  50: 0000 0000 011x
-	{ 70 << 1,        0}, { 71 << 1,        0},  //  51: 0000 0000 100x
-	{ 72 << 1,        0}, { 73 << 1,        0},  //  52: 0000 0000 101x
-	{ 74 << 1,        0}, { 75 << 1,        0},  //  53: 0000 0000 110x
-	{ 76 << 1,        0}, { 77 << 1,        0},  //  54: 0000 0000 111x
-	{       0,   0x000b}, {       0,   0x0802},  //  55: 0000 0001 000x
-	{       0,   0x0403}, {       0,   0x000a},  //  56: 0000 0001 001x
-	{       0,   0x0204}, {       0,   0x0702},  //  57: 0000 0001 010x
-	{       0,   0x1501}, {       0,   0x1401},  //  58: 0000 0001 011x
-	{       0,   0x0009}, {       0,   0x1301},  //  59: 0000 0001 100x
-	{       0,   0x1201}, {       0,   0x0105},  //  60: 0000 0001 101x
-	{       0,   0x0303}, {       0,   0x0008},  //  61: 0000 0001 110x
-	{       0,   0x0602}, {       0,   0x1101},  //  62: 0000 0001 111x
-	{ 78 << 1,        0}, { 79 << 1,        0},  //  63: 0000 0000 0001x
-	{ 80 << 1,        0}, { 81 << 1,        0},  //  64: 0000 0000 0010x
-	{ 82 << 1,        0}, { 83 << 1,        0},  //  65: 0000 0000 0011x
-	{ 84 << 1,        0}, { 85 << 1,        0},  //  66: 0000 0000 0100x
-	{ 86 << 1,        0}, { 87 << 1,        0},  //  67: 0000 0000 0101x
-	{ 88 << 1,        0}, { 89 << 1,        0},  //  68: 0000 0000 0110x
-	{ 90 << 1,        0}, { 91 << 1,        0},  //  69: 0000 0000 0111x
-	{       0,   0x0a02}, {       0,   0x0902},  //  70: 0000 0000 1000x
-	{       0,   0x0503}, {       0,   0x0304},  //  71: 0000 0000 1001x
-	{       0,   0x0205}, {       0,   0x0107},  //  72: 0000 0000 1010x
-	{       0,   0x0106}, {       0,   0x000f},  //  73: 0000 0000 1011x
-	{       0,   0x000e}, {       0,   0x000d},  //  74: 0000 0000 1100x
-	{       0,   0x000c}, {       0,   0x1a01},  //  75: 0000 0000 1101x
-	{       0,   0x1901}, {       0,   0x1801},  //  76: 0000 0000 1110x
-	{       0,   0x1701}, {       0,   0x1601},  //  77: 0000 0000 1111x
-	{ 92 << 1,        0}, { 93 << 1,        0},  //  78: 0000 0000 0001 0x
-	{ 94 << 1,        0}, { 95 << 1,        0},  //  79: 0000 0000 0001 1x
-	{ 96 << 1,        0}, { 97 << 1,        0},  //  80: 0000 0000 0010 0x
-	{ 98 << 1,        0}, { 99 << 1,        0},  //  81: 0000 0000 0010 1x
-	{100 << 1,        0}, {101 << 1,        0},  //  82: 0000 0000 0011 0x
-	{102 << 1,        0}, {103 << 1,        0},  //  83: 0000 0000 0011 1x
-	{       0,   0x001f}, {       0,   0x001e},  //  84: 0000 0000 0100 0x
-	{       0,   0x001d}, {       0,   0x001c},  //  85: 0000 0000 0100 1x
-	{       0,   0x001b}, {       0,   0x001a},  //  86: 0000 0000 0101 0x
-	{       0,   0x0019}, {       0,   0x0018},  //  87: 0000 0000 0101 1x
-	{       0,   0x0017}, {       0,   0x0016},  //  88: 0000 0000 0110 0x
-	{       0,   0x0015}, {       0,   0x0014},  //  89: 0000 0000 0110 1x
-	{       0,   0x0013}, {       0,   0x0012},  //  90: 0000 0000 0111 0x
-	{       0,   0x0011}, {       0,   0x0010},  //  91: 0000 0000 0111 1x
-	{104 << 1,        0}, {105 << 1,        0},  //  92: 0000 0000 0001 00x
-	{106 << 1,        0}, {107 << 1,        0},  //  93: 0000 0000 0001 01x
-	{108 << 1,        0}, {109 << 1,        0},  //  94: 0000 0000 0001 10x
-	{110 << 1,        0}, {111 << 1,        0},  //  95: 0000 0000 0001 11x
-	{       0,   0x0028}, {       0,   0x0027},  //  96: 0000 0000 0010 00x
-	{       0,   0x0026}, {       0,   0x0025},  //  97: 0000 0000 0010 01x
-	{       0,   0x0024}, {       0,   0x0023},  //  98: 0000 0000 0010 10x
-	{       0,   0x0022}, {       0,   0x0021},  //  99: 0000 0000 0010 11x
-	{       0,   0x0020}, {       0,   0x010e},  // 100: 0000 0000 0011 00x
-	{       0,   0x010d}, {       0,   0x010c},  // 101: 0000 0000 0011 01x
-	{       0,   0x010b}, {       0,   0x010a},  // 102: 0000 0000 0011 10x
-	{       0,   0x0109}, {       0,   0x0108},  // 103: 0000 0000 0011 11x
-	{       0,   0x0112}, {       0,   0x0111},  // 104: 0000 0000 0001 000x
-	{       0,   0x0110}, {       0,   0x010f},  // 105: 0000 0000 0001 001x
-	{       0,   0x0603}, {       0,   0x1002},  // 106: 0000 0000 0001 010x
-	{       0,   0x0f02}, {       0,   0x0e02},  // 107: 0000 0000 0001 011x
-	{       0,   0x0d02}, {       0,   0x0c02},  // 108: 0000 0000 0001 100x
-	{       0,   0x0b02}, {       0,   0x1f01},  // 109: 0000 0000 0001 101x
-	{       0,   0x1e01}, {       0,   0x1d01},  // 110: 0000 0000 0001 110x
-	{       0,   0x1c01}, {       0,   0x1b01},  // 111: 0000 0000 0001 111x
+// Fast DCT coefficient VLC. The original 224-entry binary tree (896 bytes)
+// is replaced by a 7-bit prefix table plus a compact continuation tree
+// (748 bytes total), so decoder RAM and read-only footprint do not grow.
+//
+// Prefix entries are 3 bytes: value/node in bits 0..15, consumed bit count in
+// bits 16..18, and bit 23 marks a terminal value.
+// Continuation children use bit 15 as a node marker; terminal values use the
+// 15-bit slot directly, with 0x7fff standing in for the 0xffff escape code.
+
+static const uint8_t PLM_VIDEO_DCT_COEFF_FAST[128][3] = {
+{0,0,7}, {1,0,7}, {255,255,134}, {255,255,134}, {2,2,135}, {1,9,135}, {4,0,135}, {1,8,135},
+{1,7,134}, {1,7,134}, {1,6,134}, {1,6,134}, {2,1,134}, {2,1,134}, {1,5,134}, {1,5,134},
+{2,0,7}, {3,0,7}, {4,0,7}, {5,0,7}, {3,0,133}, {3,0,133}, {3,0,133}, {3,0,133},
+{1,4,133}, {1,4,133}, {1,4,133}, {1,4,133}, {1,3,133}, {1,3,133}, {1,3,133}, {1,3,133},
+{2,0,132}, {2,0,132}, {2,0,132}, {2,0,132}, {2,0,132}, {2,0,132}, {2,0,132}, {2,0,132},
+{1,2,132}, {1,2,132}, {1,2,132}, {1,2,132}, {1,2,132}, {1,2,132}, {1,2,132}, {1,2,132},
+{1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131},
+{1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131}, {1,1,131},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
+{1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129}, {1,0,129},
 };
+static const uint16_t PLM_VIDEO_DCT_COEFF_CONT[182] = {
+32774, 32775, 32776, 32777, 3329, 6, 3073, 2817,
+770, 259, 5, 2561, 32778, 32779, 32780, 32781,
+32782, 32783, 32784, 32785, 32786, 32787, 32788, 32789,
+32790, 32791, 32792, 32793, 4097, 1282, 7, 515,
+260, 3841, 3585, 1026, 32794, 32795, 32796, 32797,
+32798, 32799, 32800, 32801, 32802, 32803, 32804, 32805,
+32806, 32807, 32808, 32809, 0, 32810, 32811, 32812,
+32813, 32814, 32815, 32816, 32817, 32818, 32819, 32820,
+32821, 32822, 32823, 32824, 11, 2050, 1027, 10,
+516, 1794, 5377, 5121, 9, 4865, 4609, 261,
+771, 8, 1538, 4353, 32825, 32826, 32827, 32828,
+32829, 32830, 32831, 32832, 32833, 32834, 32835, 32836,
+32837, 32838, 2562, 2306, 1283, 772, 517, 263,
+262, 15, 14, 13, 12, 6657, 6401, 6145,
+5889, 5633, 32839, 32840, 32841, 32842, 32843, 32844,
+32845, 32846, 32847, 32848, 32849, 32850, 31, 30,
+29, 28, 27, 26, 25, 24, 23, 22,
+21, 20, 19, 18, 17, 16, 32851, 32852,
+32853, 32854, 32855, 32856, 32857, 32858, 40, 39,
+38, 37, 36, 35, 34, 33, 32, 270,
+269, 268, 267, 266, 265, 264, 274, 273,
+272, 271, 1539, 4098, 3842, 3586, 3330, 3074,
+2818, 7937, 7681, 7425, 7169, 6913,
+};
+
+static inline unsigned int plm_video_peek_bits(const uint8_t *p, int shift, int count) {
+	if (count <= 0) {
+		return 0;
+	}
+	if (shift + count <= 8) {
+		return (p[0] >> (8 - shift - count)) & ((1u << count) - 1);
+	}
+	return ((((unsigned int)p[0] << 8) | p[1]) >> (16 - shift - count)) & ((1u << count) - 1);
+}
+
+static inline uint16_t plm_video_dct_continue(plm_buffer_t *self, unsigned int node) {
+	for (;;) {
+		uint16_t child = PLM_VIDEO_DCT_COEFF_CONT[
+			(node << 1) + plm_buffer_read(self, 1)
+		];
+		if ((child & 0x8000) != 0) {
+			node = child & 0x7fff;
+		}
+		else {
+			return child == 0x7fff ? 0xffff : child;
+		}
+	}
+}
+
+static inline uint16_t plm_buffer_read_vlc_dct(plm_buffer_t *self) {
+	size_t cached_bits = (self->length << 3) - self->bit_index;
+	if (cached_bits >= 7 || plm_buffer_has(self, 7)) {
+		size_t bit_index = self->bit_index;
+		const uint8_t *p = self->bytes + (bit_index >> 3);
+		unsigned int prefix = plm_video_peek_bits(p, (int)(bit_index & 7), 7);
+		const uint8_t *entry_bytes = PLM_VIDEO_DCT_COEFF_FAST[prefix];
+		uint32_t entry = (uint32_t)entry_bytes[0]
+			| ((uint32_t)entry_bytes[1] << 8)
+			| ((uint32_t)entry_bytes[2] << 16);
+		self->bit_index = bit_index + ((entry >> 16) & 0x1f);
+		if ((entry & 0x800000) != 0) {
+			return (uint16_t)entry;
+		}
+		return plm_video_dct_continue(self, entry & 0xffff);
+	}
+
+	size_t bit_index = self->bit_index;
+	size_t end_bit = self->length << 3;
+	size_t available = end_bit > bit_index ? end_bit - bit_index : 0;
+	if (available > 7) {
+		available = 7;
+	}
+	int shift = (int)(bit_index & 7);
+	unsigned int prefix = plm_video_peek_bits(
+		self->bytes + (bit_index >> 3), shift, (int)available
+	) << (7 - available);
+	const uint8_t *entry_bytes = PLM_VIDEO_DCT_COEFF_FAST[prefix];
+	uint32_t entry = (uint32_t)entry_bytes[0]
+		| ((uint32_t)entry_bytes[1] << 8)
+		| ((uint32_t)entry_bytes[2] << 16);
+	int bits = (int)((entry >> 16) & 0x1f);
+	self->bit_index = bit_index + (bits < (int)available ? bits : (int)available);
+	if ((entry & 0x800000) != 0) {
+		return (uint16_t)entry;
+	}
+	return plm_video_dct_continue(self, entry & 0xffff);
+}
+
 
 typedef struct {
 	int full_px;
@@ -3342,43 +3361,104 @@ void plm_video_interpolate_macroblock(plm_video_t *self, plm_frame_t *s, int mot
 		DEST_INDEX += dest_scan; \
 	}} while(FALSE)
 
+static inline uint64_t plm_video_load64(const uint8_t *p) {
+	uint64_t value;
+	memcpy(&value, p, sizeof(value));
+	return value;
+}
+
+static inline void plm_video_store64(uint8_t *p, uint64_t value) {
+	memcpy(p, &value, sizeof(value));
+}
+
+// Packed byte fixed-point averages. All lanes are independent and rounded
+// exactly like the scalar expressions used by MPEG-1 motion compensation.
+static inline uint64_t plm_video_avg2(uint64_t a, uint64_t b) {
+	uint64_t x = a ^ b;
+	return (a | b) - ((x >> 1) & UINT64_C(0x7f7f7f7f7f7f7f7f));
+}
+
+static inline uint64_t plm_video_avg4(uint64_t a, uint64_t b, uint64_t c, uint64_t d) {
+	uint64_t lo = (a & UINT64_C(0x00ff00ff00ff00ff))
+		+ (b & UINT64_C(0x00ff00ff00ff00ff))
+		+ (c & UINT64_C(0x00ff00ff00ff00ff))
+		+ (d & UINT64_C(0x00ff00ff00ff00ff))
+		+ UINT64_C(0x0002000200020002);
+	uint64_t hi = ((a >> 8) & UINT64_C(0x00ff00ff00ff00ff))
+		+ ((b >> 8) & UINT64_C(0x00ff00ff00ff00ff))
+		+ ((c >> 8) & UINT64_C(0x00ff00ff00ff00ff))
+		+ ((d >> 8) & UINT64_C(0x00ff00ff00ff00ff))
+		+ UINT64_C(0x0002000200020002);
+	return ((lo >> 2) & UINT64_C(0x00ff00ff00ff00ff))
+		| (((hi >> 2) & UINT64_C(0x00ff00ff00ff00ff)) << 8);
+}
+
+#define PLM_VIDEO_MC_ROWS(MODE) \
+	for (int y = 0; y < block_size; y++) { \
+		const uint8_t *source_row = source + y * dw; \
+		uint8_t *dest_row = dest + y * dw; \
+		for (int x = 0; x < block_size; x += 8) { \
+			uint64_t s0 = plm_video_load64(source_row + x); \
+			uint64_t s1 = plm_video_load64(source_row + x + 1); \
+			uint64_t s2 = plm_video_load64(source_row + x + dw); \
+			uint64_t s3 = plm_video_load64(source_row + x + dw + 1); \
+			uint64_t d0 = plm_video_load64(dest_row + x); \
+			uint64_t value; \
+			switch (MODE) { \
+				case 0: value = d0; break; \
+				case 1: value = plm_video_avg2(s0, s2); break; \
+				case 2: value = plm_video_avg2(s0, s1); break; \
+				case 3: value = plm_video_avg4(s0, s1, s2, s3); break; \
+				case 4: value = plm_video_avg2(d0, s0); break; \
+				case 5: value = plm_video_avg2(d0, plm_video_avg2(s0, s2)); break; \
+				case 6: value = plm_video_avg2(d0, plm_video_avg2(s0, s1)); break; \
+				default: value = plm_video_avg2(d0, plm_video_avg4(s0, s1, s2, s3)); break; \
+			} \
+			plm_video_store64(dest_row + x, value); \
+		} \
+	}
+
+static inline void plm_video_mc_block(
+	uint8_t *dest, const uint8_t *source, int dw, int block_size, int mode
+) {
+	if (mode == 0) {
+		// Full-pixel copy: no per-pixel arithmetic.
+		for (int y = 0; y < block_size; y++) {
+			memcpy(dest + y * dw, source + y * dw, block_size);
+		}
+		return;
+	}
+	#define PLM_VIDEO_MC_CASE(MODE) case MODE: PLM_VIDEO_MC_ROWS(MODE); break
+	switch (mode) {
+		PLM_VIDEO_MC_CASE(1);
+		PLM_VIDEO_MC_CASE(2);
+		PLM_VIDEO_MC_CASE(3);
+		PLM_VIDEO_MC_CASE(4);
+		PLM_VIDEO_MC_CASE(5);
+		PLM_VIDEO_MC_CASE(6);
+		PLM_VIDEO_MC_CASE(7);
+		default: return;
+	}
+	#undef PLM_VIDEO_MC_CASE
+}
+
 void plm_video_process_macroblock(
 	plm_video_t *self, uint8_t *s, uint8_t *d,
 	int motion_h, int motion_v, int block_size, int interpolate
 ) {
 	int dw = self->mb_width * block_size;
-
 	int hp = motion_h >> 1;
 	int vp = motion_v >> 1;
 	int odd_h = (motion_h & 1) == 1;
 	int odd_v = (motion_v & 1) == 1;
-
 	unsigned int si = ((self->mb_row * block_size) + vp) * dw + (self->mb_col * block_size) + hp;
 	unsigned int di = (self->mb_row * dw + self->mb_col) * block_size;
-	
 	unsigned int max_address = (dw * (self->mb_height * block_size - block_size + 1) - block_size);
 	if (si > max_address || di > max_address) {
 		return; // corrupt video
 	}
-
-	#define PLM_MB_CASE(INTERPOLATE, ODD_H, ODD_V, OP) \
-		case ((INTERPOLATE << 2) | (ODD_H << 1) | (ODD_V)): \
-			PLM_BLOCK_SET(d, di, dw, si, dw, block_size, OP); \
-			break
-
-	switch ((interpolate << 2) | (odd_h << 1) | (odd_v)) {
-		PLM_MB_CASE(0, 0, 0, (s[si]));
-		PLM_MB_CASE(0, 0, 1, (s[si] + s[si + dw] + 1) >> 1);
-		PLM_MB_CASE(0, 1, 0, (s[si] + s[si + 1] + 1) >> 1);
-		PLM_MB_CASE(0, 1, 1, (s[si] + s[si + 1] + s[si + dw] + s[si + dw + 1] + 2) >> 2);
-
-		PLM_MB_CASE(1, 0, 0, (d[di] + (s[si]) + 1) >> 1);
-		PLM_MB_CASE(1, 0, 1, (d[di] + ((s[si] + s[si + dw] + 1) >> 1) + 1) >> 1);
-		PLM_MB_CASE(1, 1, 0, (d[di] + ((s[si] + s[si + 1] + 1) >> 1) + 1) >> 1);
-		PLM_MB_CASE(1, 1, 1, (d[di] + ((s[si] + s[si + 1] + s[si + dw] + s[si + dw + 1] + 2) >> 2) + 1) >> 1);
-	}
-
-	#undef PLM_MB_CASE
+	plm_video_mc_block(d + di, s + si, dw, block_size,
+		(interpolate << 2) | (odd_h << 1) | (odd_v));
 }
 
 void plm_video_decode_block(plm_video_t *self, int block) {
@@ -3427,7 +3507,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 	int level = 0;
 	while (TRUE) {
 		int run = 0;
-		uint16_t coeff = plm_buffer_read_vlc_uint(self->buffer, PLM_VIDEO_DCT_COEFF);
+		uint16_t coeff = plm_buffer_read_vlc_dct(self->buffer);
 
 		if ((coeff == 0x0001) && (n > 0) && (plm_buffer_read(self->buffer, 1) == 0)) {
 			// end_of_block
@@ -3463,21 +3543,13 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		int de_zig_zagged = PLM_VIDEO_ZIG_ZAG[n];
 		n++;
 
-		// Dequantize, oddify, clip
+		// Dequantize, oddify, clip. Keep these branchless: coefficient signs
+		// are effectively random in detailed material.
 		level = (unsigned)level << 1;
-		if (!self->macroblock_intra) {
-			level += (level < 0 ? -1 : 1);
-		}
+		level += self->macroblock_intra ? 0 : ((level < 0) ? -1 : 1);
 		level = (level * self->quantizer_scale * quant_matrix[de_zig_zagged]) >> 4;
-		if ((level & 1) == 0) {
-			level -= level > 0 ? 1 : -1;
-		}
-		if (level > 2047) {
-			level = 2047;
-		}
-		else if (level < -2048) {
-			level = -2048;
-		}
+		level -= ((level & 1) == 0) * ((level > 0) ? 1 : -1);
+		level = level > 2047 ? 2047 : (level < -2048 ? -2048 : level);
 
 		// Save premultiplied coefficient
 		self->block_data[de_zig_zagged] = level * PLM_VIDEO_PREMULTIPLIER_MATRIX[de_zig_zagged];
